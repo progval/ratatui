@@ -16,7 +16,16 @@ const NBSP: &str = "\u{00a0}";
 /// Cannot implement it as Iterator since it yields slices of the internal buffer (need streaming
 /// iterators for that).
 pub trait LineComposer<'a> {
-    fn next_line(&mut self) -> Option<(&[StyledGrapheme<'a>], u16, Alignment)>;
+    fn next_line<'lend>(&'lend mut self) -> Option<WrappedLine<'lend, 'a>>;
+}
+
+pub struct WrappedLine<'lend, 'text> {
+    /// One line reflowed to the correct width
+    pub line: &'lend [StyledGrapheme<'text>],
+    /// The width of the line
+    pub width: u16,
+    /// Whether the line was aligned left or right
+    pub alignment: Alignment,
 }
 
 /// A state machine that wraps lines on word boundaries.
@@ -68,7 +77,7 @@ where
     O: Iterator<Item = (I, Alignment)>,
     I: Iterator<Item = StyledGrapheme<'a>>,
 {
-    fn next_line(&mut self) -> Option<(&[StyledGrapheme<'a>], u16, Alignment)> {
+    fn next_line<'lend>(&'lend mut self) -> Option<WrappedLine<'lend, 'a>> {
         if self.max_line_width == 0 {
             return None;
         }
@@ -212,7 +221,11 @@ where
 
         if let Some(line) = current_line {
             self.current_line = line;
-            Some((&self.current_line[..], line_width, self.current_alignment))
+            Some(WrappedLine {
+                line: &self.current_line[..],
+                width: line_width,
+                alignment: self.current_alignment,
+            })
         } else {
             None
         }
@@ -268,7 +281,7 @@ where
     O: Iterator<Item = (I, Alignment)>,
     I: Iterator<Item = StyledGrapheme<'a>>,
 {
-    fn next_line(&mut self) -> Option<(&[StyledGrapheme<'a>], u16, Alignment)> {
+    fn next_line<'lend>(&'lend mut self) -> Option<WrappedLine<'lend, 'a>> {
         if self.max_line_width == 0 {
             return None;
         }
@@ -315,11 +328,11 @@ where
         if lines_exhausted {
             None
         } else {
-            Some((
-                &self.current_line[..],
-                current_line_width,
-                current_alignment,
-            ))
+            Some(WrappedLine {
+                line: &self.current_line[..],
+                width: current_line_width,
+                alignment: current_alignment,
+            })
         }
     }
 }
@@ -379,7 +392,12 @@ mod test {
         let mut lines = vec![];
         let mut widths = vec![];
         let mut alignments = vec![];
-        while let Some((styled, width, alignment)) = composer.next_line() {
+        while let Some(WrappedLine {
+            line: styled,
+            width,
+            alignment,
+        }) = composer.next_line()
+        {
             let line = styled
                 .iter()
                 .map(|StyledGrapheme { symbol, .. }| *symbol)
