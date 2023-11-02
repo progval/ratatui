@@ -66,7 +66,7 @@ where
     /// Creates a new [`WordWrapper`].
     ///
     /// The `lines` are the list of lines to be re-formatted, so each call to
-    /// [`WordWrapper::next_line`] returns fragments of which whose width is at most
+    /// [`WordWrapper::next`] returns fragments of which whose width is at most
     /// `max_line_width`.
     ///
     /// `trim` configures whether leading whitespaces should be trimmed from each line.
@@ -275,7 +275,7 @@ where
     /// Creates a new [`WordWrapper`].
     ///
     /// The `lines` are the list of lines to be re-formatted, so each call to
-    /// [`WordWrapper::next_line`] returns the start of each line so that its width is at most
+    /// [`LineTruncator::next`] returns the start of each line so that its width is at most
     /// `max_line_width`.
     ///
     /// `trim` configures whether leading whitespaces should be trimmed from each line.
