@@ -1,3 +1,4 @@
+use lender::{Lender, Lending};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
@@ -6,7 +7,7 @@ use crate::{
     style::{Style, Styled},
     text::{StyledGrapheme, Text},
     widgets::{
-        reflow::{LineComposer, LineTruncator, WordWrapper, WrappedLine},
+        reflow::{LineTruncator, WordWrapper, WrappedLine},
         Block, Widget,
     },
 };
@@ -209,18 +210,20 @@ impl<'a> Paragraph<'a> {
         self
     }
 
-    fn render_with_composer<LC>(&self, text_area: Rect, buf: &mut Buffer, mut line_composer: LC)
+    fn render_with_composer<LC>(&self, text_area: Rect, buf: &mut Buffer, line_composer: LC)
     where
-        LC: LineComposer<'a>,
+        LC: Lender + for<'lend> Lending<'lend, Lend = WrappedLine<'lend, 'a>>,
     {
-        let mut y = 0;
-        while let Some(WrappedLine {
-            line: current_line,
-            width: current_line_width,
-            alignment: current_line_alignment,
-        }) = line_composer.next_line()
-        {
-            if y >= self.scroll.0 {
+        line_composer
+            .skip(self.scroll.0 as usize)
+            .take(text_area.height as usize)
+            .enumerate()
+            .for_each(|(y, line)| {
+                let WrappedLine {
+                    line: current_line,
+                    width: current_line_width,
+                    alignment: current_line_alignment,
+                } = line;
                 let mut x =
                     get_line_offset(current_line_width, text_area.width, current_line_alignment);
                 for StyledGrapheme { symbol, style } in current_line {
@@ -228,7 +231,7 @@ impl<'a> Paragraph<'a> {
                     if width == 0 {
                         continue;
                     }
-                    buf.get_mut(text_area.left() + x, text_area.top() + y - self.scroll.0)
+                    buf.get_mut(text_area.left() + x, text_area.top() + (y as u16))
                         .set_symbol(if symbol.is_empty() {
                             // If the symbol is empty, the last char which rendered last time will
                             // leave on the line. It's a quick fix.
@@ -239,12 +242,7 @@ impl<'a> Paragraph<'a> {
                         .set_style(*style);
                     x += width as u16;
                 }
-            }
-            y += 1;
-            if y >= text_area.height + self.scroll.0 {
-                break;
-            }
-        }
+            })
     }
 }
 
